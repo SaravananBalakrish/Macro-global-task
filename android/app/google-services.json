@@ -1,0 +1,90 @@
+{
+  "project_info": {
+    "project_number": "1086579710745",
+    "project_id": "chat-app-dfbea",
+    "storage_bucket": "chat-app-dfbea.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1086579710745:android:f54d48e45ee4d14b230388",
+        "android_client_info": {
+          "package_name": "com.example.macro_global_task"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1086579710745-rdps0e6j97mlm2cpv6r4vbbtgvfht480.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC3nXtS0CBbA3iVIyTDOwdfjH2-rrdyLWk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1086579710745-rdps0e6j97mlm2cpv6r4vbbtgvfht480.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1086579710745-0up429m11ohkkulf60tivqnl2295eq0t.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.hingesCreations"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1086579710745:android:0b4dac9f0eca37f4230388",
+        "android_client_info": {
+          "package_name": "com.saravanan.macroglobal"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1086579710745-lt02aup9t9vs8jt5j4eh6l16qa1akk44.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.saravanan.macroglobal",
+            "certificate_hash": "de1c4862ea59e271f79192a861c58b72b76091c6"
+          }
+        },
+        {
+          "client_id": "1086579710745-rdps0e6j97mlm2cpv6r4vbbtgvfht480.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC3nXtS0CBbA3iVIyTDOwdfjH2-rrdyLWk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1086579710745-rdps0e6j97mlm2cpv6r4vbbtgvfht480.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1086579710745-0up429m11ohkkulf60tivqnl2295eq0t.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.hingesCreations"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
