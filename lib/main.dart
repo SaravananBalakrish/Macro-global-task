@@ -8,21 +8,32 @@ import 'package:provider/provider.dart';
 
 import 'firebase_options.dart';
 
-void main() async{
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
   final authProvider = AuthProvider();
-  final storedUser = await authProvider.getStoredUser();
+
+  bool isLoggedIn = false;
+  try {
+    await authProvider.loadStoredUser();
+    isLoggedIn = authProvider.currentUser != null;
+    print(authProvider.currentUser?.toJson() ?? "Not stored");
+  } catch (e) {
+    debugPrint("Error loading stored user: $e");
+  }
+
   runApp(
-      MultiProvider(
-        providers: [
-          ChangeNotifierProvider(create: (_) => authProvider),
-          ChangeNotifierProvider(create: (_) => TaskProvider()),
-        ],
-        child: MyApp(isLoggedIn: storedUser != null),
-      )
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => authProvider),
+        ChangeNotifierProvider(create: (_) => TaskProvider()),
+      ],
+      child: MyApp(isLoggedIn: isLoggedIn),
+    ),
   );
 }
 

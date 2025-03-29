@@ -21,29 +21,36 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   void _signUp(BuildContext context) async {
     if (!_formKey.currentState!.validate()) return;
+
     setState(() => _isLoading = true);
-    try {
-      await Provider.of<AuthProvider>(context, listen: false).signUp(
-        _nameController.text,
-        _emailController.text,
-        _passwordController.text,
-        _phoneController.text,
-      );
-      Navigator.pushReplacement(
-          context, MaterialPageRoute(builder: (_) => TaskListScreen()));
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-    }
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    String result = await authProvider.signUp(
+      _nameController.text,
+      _emailController.text,
+      _passwordController.text,
+      _phoneController.text,
+    );
+
     setState(() => _isLoading = false);
+
+    if (result == "Signup successful!") {
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => TaskListScreen()));
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result)));
+    }
   }
 
   void _signUpWithGoogle(BuildContext context) async {
-    try {
-      await Provider.of<AuthProvider>(context, listen: false).signInWithGoogle();
-      Navigator.pushReplacement(
-          context, MaterialPageRoute(builder: (_) => TaskListScreen()));
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    setState(() => _isLoading = true);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    String result = await authProvider.signInWithGoogle();
+
+    setState(() => _isLoading = false);
+
+    if (result == "Google Sign-In successful!") {
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => TaskListScreen()));
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result)));
     }
   }
 
@@ -74,7 +81,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   decoration: InputDecoration(labelText: "Email"),
                   keyboardType: TextInputType.emailAddress,
                   validator: (value) {
-                    if (value == null || !value.contains("@")) return "Enter a valid email";
+                    if (value == null || value.isEmpty || !value.contains("@")) {
+                      return "Enter a valid email";
+                    }
                     return null;
                   },
                 ),
@@ -84,7 +93,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   decoration: InputDecoration(labelText: "Phone Number"),
                   keyboardType: TextInputType.phone,
                   validator: (value) {
-                    if (value == null || value.length < 10) return "Enter a valid phone number";
+                    if (value == null || value.length < 10) {
+                      return "Enter a valid phone number (at least 10 digits)";
+                    }
                     return null;
                   },
                 ),
@@ -94,21 +105,27 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   decoration: InputDecoration(labelText: "Password"),
                   obscureText: true,
                   validator: (value) {
-                    if (value == null || value.length < 6) return "Password must be at least 6 characters";
+                    if (value == null || value.length < 6) {
+                      return "Password must be at least 6 characters";
+                    }
                     return null;
                   },
                 ),
                 SizedBox(height: 20),
                 _isLoading
                     ? CircularProgressIndicator()
-                    : ElevatedButton(
-                  onPressed: () => _signUp(context),
-                  child: Text("Sign Up"),
-                ),
-                SizedBox(height: 10),
-                ElevatedButton(
-                  onPressed: () => _signUpWithGoogle(context),
-                  child: Text("Sign Up with Google"),
+                    : Column(
+                  children: [
+                    ElevatedButton(
+                      onPressed: () => _signUp(context),
+                      child: Text("Sign Up"),
+                    ),
+                    SizedBox(height: 10),
+                    ElevatedButton(
+                      onPressed: () => _signUpWithGoogle(context),
+                      child: Text("Sign Up with Google"),
+                    ),
+                  ],
                 ),
                 SizedBox(height: 10),
                 TextButton(

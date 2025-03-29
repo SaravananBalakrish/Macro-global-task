@@ -17,20 +17,18 @@ class TaskModel {
     required this.status,
   });
 
-  /// Convert Firestore document to `TaskModel`
   factory TaskModel.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+    final data = doc.data() as Map<String, dynamic>? ?? {};
     return TaskModel(
       id: doc.id,
-      userId: data['userId'],
-      title: data['title'],
-      description: data['description'],
-      deadline: (data['deadline'] as Timestamp).toDate(),
-      status: data['status'],
+      userId: data['userId'] ?? '', // Default to empty string if missing
+      title: data['title'] ?? 'Untitled',
+      description: data['description'] ?? '',
+      deadline: (data['deadline'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      status: data['status'] ?? 'Pending',
     );
   }
 
-  /// Convert `TaskModel` to JSON (Firestore & Local Storage)
   Map<String, dynamic> toMap() {
     return {
       'userId': userId,

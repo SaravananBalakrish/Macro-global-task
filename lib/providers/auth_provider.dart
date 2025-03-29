@@ -12,39 +12,44 @@ class AuthProvider with ChangeNotifier {
 
   UserModel? get currentUser => _currentUser;
 
-  /// **Check if User Exists in Firestore**
   Future<bool> doesUserExist(String email) async {
-    final userQuery = await _firestore.collection("users").where("email", isEqualTo: email).get();
-    return userQuery.docs.isNotEmpty;
-  }
-
-  /// **Save User Data Locally using SharedPreferences**
-  Future<void> saveUserLocally(UserModel user) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('user_data', user.toJson());
-  }
-
-  /// **Get Stored User Data from SharedPreferences**
-  Future<UserModel?> getStoredUser() async {
-    final prefs = await SharedPreferences.getInstance();
-    String? userData = prefs.getString('user_data');
-    if (userData != null) {
-      print("userData :: $userData");
-      return UserModel.fromJson(userData);
-    }
-    notifyListeners();
-    return null;
-  }
-
-  /// **Signup with Email & Password**
-  Future<void> signUp(String name, String email, String password, String phone) async {
     try {
-      // **Check if User Exists**
-      bool exists = await doesUserExist(email);
-      if (exists) {
-        throw Exception("User already exists. Please log in.");
-      }
+      final userQuery = await _firestore.collection("users").where("email", isEqualTo: email).get();
+      return userQuery.docs.isNotEmpty;
+    } catch (e) {
+      return false; // Silently fail; assume user doesn’t exist if there’s an error
+    }
+  }
 
+  Future<void> saveUserLocally(UserModel user) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('user_data', user.toJson());
+      _currentUser = user;
+      notifyListeners();
+    } catch (e) {
+      // Handle silently; user will still be logged in but not persisted locally
+    }
+  }
+
+  Future<void> loadStoredUser() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      String? userData = prefs.getString('user_data');
+      if (userData != null && userData.isNotEmpty) {
+        _currentUser = UserModel.fromJson(userData);
+        notifyListeners();
+      }
+    } catch (e) {
+      // Handle silently; no stored user found
+    }
+  }
+
+  Future<String> signUp(String name, String email, String password, String phone) async {
+    try {
+      if (await doesUserExist(email)) {
+        return "User already exists. Please log in.";
+      }
       UserCredential userCredential = await _auth.createUserWithEmailAndPassword(email: email, password: password);
       User? user = userCredential.user;
 
@@ -56,54 +61,43 @@ class AuthProvider with ChangeNotifier {
           phone: phone,
           createdAt: DateTime.now(),
         );
-
-        // **Store in Firestore**
         await _firestore.collection('users').doc(user.uid).set(newUser.toMap());
-
-        // **Save Locally**
         await saveUserLocally(newUser);
-        _currentUser = newUser;
+        return "Signup successful!";
       }
-      notifyListeners();
+      return "Signup failed unexpectedly.";
+    } on FirebaseAuthException catch (e) {
+      return _handleAuthError(e);
     } catch (e) {
-      throw Exception(e.toString());
+      return "An unexpected error occurred. Please try again.";
     }
   }
 
-  /// **Login with Email & Password**
-  Future<void> login(String email, String password) async {
+  Future<String> login(String email, String password) async {
     try {
-      // **Check if User Exists**
-      bool exists = await doesUserExist(email);
-      if (!exists) {
-        throw Exception("No user found for this email. Please sign up.");
-      }
-
       UserCredential userCredential = await _auth.signInWithEmailAndPassword(email: email, password: password);
       User? user = userCredential.user;
 
       if (user != null) {
-        // **Fetch user details from Firestore**
         DocumentSnapshot userDoc = await _firestore.collection("users").doc(user.uid).get();
         if (userDoc.exists) {
           UserModel loggedInUser = UserModel.fromMap(userDoc.data() as Map<String, dynamic>);
-
-          // **Save user data locally**
           await saveUserLocally(loggedInUser);
-          _currentUser = loggedInUser;
+          return "Login successful!";
         }
       }
-      notifyListeners();
+      return "Login failed unexpectedly.";
     } on FirebaseAuthException catch (e) {
-      throw Exception(e.message ?? "Login failed");
+      return _handleAuthError(e);
+    } catch (e) {
+      return "An unexpected error occurred. Please try again.";
     }
   }
 
-  /// **Google Sign-In**
-  Future<void> signInWithGoogle() async {
+  Future<String> signInWithGoogle() async {
     try {
       final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
-      if (googleUser == null) return;
+      if (googleUser == null) return "Google Sign-In canceled.";
 
       final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
       final credential = GoogleAuthProvider.credential(
@@ -115,14 +109,12 @@ class AuthProvider with ChangeNotifier {
       User? user = userCredential.user;
 
       if (user != null) {
-        // **Check if user exists in Firestore**
         DocumentSnapshot userDoc = await _firestore.collection("users").doc(user.uid).get();
-
         UserModel newUser;
+
         if (userDoc.exists) {
           newUser = UserModel.fromMap(userDoc.data() as Map<String, dynamic>);
         } else {
-          // **Store user in Firestore**
           newUser = UserModel(
             uid: user.uid,
             name: user.displayName ?? "",
@@ -132,27 +124,51 @@ class AuthProvider with ChangeNotifier {
           );
           await _firestore.collection("users").doc(user.uid).set(newUser.toMap());
         }
-
-        // **Save user data locally**
         await saveUserLocally(newUser);
-        _currentUser = newUser;
+        return "Google Sign-In successful!";
       }
-      notifyListeners();
+      return "Google Sign-In failed unexpectedly.";
+    } on FirebaseAuthException catch (e) {
+      return _handleAuthError(e);
     } catch (e) {
-      throw Exception("Google Sign-In failed: ${e.toString()}");
+      return "An unexpected error occurred. Please try again.";
     }
   }
 
-  /// **Logout and Clear SharedPreferences**
-  Future<void> logout() async {
-    await _auth.signOut();
-    await GoogleSignIn().signOut();
+  Future<String> logout() async {
+    try {
+      await _auth.signOut();
+      await GoogleSignIn().signOut();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('user_data');
+      _currentUser = null;
+      notifyListeners();
+      return "Logout successful!";
+    } catch (e) {
+      return "An error occurred during logout. Please try again.";
+    }
+  }
 
-    // **Clear Local Storage**
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('user_data');
-
-    _currentUser = null;
-    notifyListeners();
+  String _handleAuthError(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'invalid-email':
+        return "The email address is badly formatted.";
+      case 'user-disabled':
+        return "This user has been disabled. Please contact support.";
+      case 'user-not-found':
+        return "No user found with this email. Please sign up.";
+      case 'wrong-password':
+        return "Incorrect password. Please try again.";
+      case 'email-already-in-use':
+        return "This email is already in use. Try logging in instead.";
+      case 'weak-password':
+        return "The password is too weak. Please choose a stronger password.";
+      case 'too-many-requests':
+        return "Too many attempts. Please try again later.";
+      case 'network-request-failed':
+        return "Network error. Please check your internet connection.";
+      default:
+        return e.message ?? "Authentication failed. Please try again.";
+    }
   }
 }
