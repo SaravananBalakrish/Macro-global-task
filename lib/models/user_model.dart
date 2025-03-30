@@ -33,7 +33,9 @@ class UserModel {
       name: map['name'],
       email: map['email'],
       phone: map['phone'],
-      createdAt: DateTime.parse(map['created_at']),
+      createdAt: map['created_at'] != null
+          ? DateTime.parse(map['created_at'])
+          : DateTime.now(),
     );
   }
 

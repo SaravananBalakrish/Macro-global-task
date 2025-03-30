@@ -1,55 +1,38 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_model.dart';
 
-class AuthProvider with ChangeNotifier {
+class AuthRepository {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  UserModel? _currentUser;
-
-  UserModel? get currentUser => _currentUser;
 
   Future<bool> doesUserExist(String email) async {
     try {
       final userQuery = await _firestore.collection("users").where("email", isEqualTo: email).get();
       return userQuery.docs.isNotEmpty;
     } catch (e) {
-      return false; // Silently fail; assume user doesn’t exist if there’s an error
+      return false; // Handle case where Firestore fails
     }
   }
 
   Future<void> saveUserLocally(UserModel user) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('user_data', user.toJson());
-      _currentUser = user;
-      notifyListeners();
-    } catch (e) {
-      // Handle silently; user will still be logged in but not persisted locally
-    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('user_data', user.toJson());
   }
 
-  Future<void> loadStoredUser() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      String? userData = prefs.getString('user_data');
-      if (userData != null && userData.isNotEmpty) {
-        _currentUser = UserModel.fromJson(userData);
-        notifyListeners();
-      }
-    } catch (e) {
-      // Handle silently; no stored user found
-    }
+  Future<UserModel?> loadStoredUser() async {
+    final prefs = await SharedPreferences.getInstance();
+    String? userData = prefs.getString('user_data');
+    return userData != null && userData.isNotEmpty ? UserModel.fromJson(userData) : null;
   }
 
   Future<String> signUp(String name, String email, String password, String phone) async {
     try {
-      if (await doesUserExist(email)) {
-        return "User already exists. Please log in.";
-      }
+      if (await doesUserExist(email)) return "User already exists. Please log in.";
+
       UserCredential userCredential = await _auth.createUserWithEmailAndPassword(email: email, password: password);
       User? user = userCredential.user;
 
@@ -67,7 +50,7 @@ class AuthProvider with ChangeNotifier {
       }
       return "Signup failed unexpectedly.";
     } on FirebaseAuthException catch (e) {
-      return _handleAuthError(e);
+      return _handleFirebaseAuthError(e);
     } catch (e) {
       return "An unexpected error occurred. Please try again.";
     }
@@ -84,13 +67,15 @@ class AuthProvider with ChangeNotifier {
           UserModel loggedInUser = UserModel.fromMap(userDoc.data() as Map<String, dynamic>);
           await saveUserLocally(loggedInUser);
           return "Login successful!";
+        } else {
+          return "User data not found. Please contact support.";
         }
       }
       return "Login failed unexpectedly.";
     } on FirebaseAuthException catch (e) {
-      return _handleAuthError(e);
+      return _handleFirebaseAuthError(e);
     } catch (e) {
-      return "An unexpected error occurred. Please try again.";
+      return "An unexpected error occurred. Please check your connection.";
     }
   }
 
@@ -98,7 +83,6 @@ class AuthProvider with ChangeNotifier {
     try {
       final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
       if (googleUser == null) return "Google Sign-In canceled.";
-
       final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
@@ -111,7 +95,6 @@ class AuthProvider with ChangeNotifier {
       if (user != null) {
         DocumentSnapshot userDoc = await _firestore.collection("users").doc(user.uid).get();
         UserModel newUser;
-
         if (userDoc.exists) {
           newUser = UserModel.fromMap(userDoc.data() as Map<String, dynamic>);
         } else {
@@ -129,9 +112,9 @@ class AuthProvider with ChangeNotifier {
       }
       return "Google Sign-In failed unexpectedly.";
     } on FirebaseAuthException catch (e) {
-      return _handleAuthError(e);
+      return _handleFirebaseAuthError(e);
     } catch (e) {
-      return "An unexpected error occurred. Please try again.";
+      return "An unexpected error occurred during Google Sign-In.";
     }
   }
 
@@ -141,34 +124,47 @@ class AuthProvider with ChangeNotifier {
       await GoogleSignIn().signOut();
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('user_data');
-      _currentUser = null;
-      notifyListeners();
       return "Logout successful!";
     } catch (e) {
-      return "An error occurred during logout. Please try again.";
+      return "Logout failed. Please try again.";
     }
   }
 
-  String _handleAuthError(FirebaseAuthException e) {
+  String _handleFirebaseAuthError(FirebaseAuthException e) {
+    debugPrint("Firebase Auth Error: ${e.code}");
     switch (e.code) {
-      case 'invalid-email':
-        return "The email address is badly formatted.";
-      case 'user-disabled':
-        return "This user has been disabled. Please contact support.";
-      case 'user-not-found':
-        return "No user found with this email. Please sign up.";
-      case 'wrong-password':
+      case "invalid-email":
+        return "Invalid email format. Please check and try again.";
+      case "user-disabled":
+        return "This user account has been disabled.";
+      case "user-not-found":
+        return "No user found with this email.";
+      case "wrong-password":
         return "Incorrect password. Please try again.";
-      case 'email-already-in-use':
-        return "This email is already in use. Try logging in instead.";
-      case 'weak-password':
-        return "The password is too weak. Please choose a stronger password.";
-      case 'too-many-requests':
-        return "Too many attempts. Please try again later.";
-      case 'network-request-failed':
-        return "Network error. Please check your internet connection.";
+      case "email-already-in-use":
+        return "This email is already registered. Try logging in.";
+      case "weak-password":
+        return "Password is too weak. Try a stronger one.";
+      case "network-request-failed":
+        return "Network error. Please check your connection.";
+      case "operation-not-allowed":
+        return "Sign-in method is not enabled in Firebase.";
+      case "too-many-requests":
+        return "Too many failed login attempts. Try again later.";
+      case "credential-already-in-use":
+        return "This credential is already associated with a different user.";
+      case "requires-recent-login":
+        return "Please log in again before performing this action.";
+      case "invalid-credential":
+        return "Invalid credentials. Please check and try again.";
+      case "account-exists-with-different-credential":
+        return "An account with this email exists but is linked to a different sign-in method.";
+      case "invalid-verification-code":
+        return "The verification code is incorrect. Try again.";
+      case "invalid-verification-id":
+        return "The verification ID is incorrect. Try again.";
       default:
-        return e.message ?? "Authentication failed. Please try again.";
+        return "An unexpected error occurred: ${e.message}";
     }
   }
 }
