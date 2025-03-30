@@ -14,7 +14,7 @@ class AuthRepository {
       final userQuery = await _firestore.collection("users").where("email", isEqualTo: email).get();
       return userQuery.docs.isNotEmpty;
     } catch (e) {
-      return false; // Handle case where Firestore fails
+      return false;
     }
   }
 

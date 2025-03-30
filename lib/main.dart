@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:macro_global_task/repositories/auth_repository.dart';
+import 'package:macro_global_task/utils/theme.dart';
+import 'package:macro_global_task/view_models/theme_view_model.dart';
 import 'package:provider/provider.dart';
 import 'view_models/auth_view_model.dart';
 import 'view_models/task_view_model.dart';
@@ -28,6 +30,7 @@ void main() async {
           firestore: firestore,
         )),
         ChangeNotifierProvider(create: (_) => TaskViewModel()),
+        ChangeNotifierProvider(create: (_) => ThemeViewModel()),
       ],
       child: const MyApp(),
     ),
@@ -40,13 +43,13 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final authViewModel = Provider.of<AuthViewModel>(context);
+    final themeViewModel = Provider.of<ThemeViewModel>(context);
     return MaterialApp(
       title: 'Macro Global Task',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
-      ),
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: themeViewModel.themeMode,
       home: authViewModel.currentUser != null ? const TaskListScreen() : const LoginScreen(),
     );
   }
