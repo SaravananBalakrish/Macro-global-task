@@ -21,7 +21,7 @@ class TaskModel {
     final data = doc.data() as Map<String, dynamic>? ?? {};
     return TaskModel(
       id: doc.id,
-      userId: data['userId'] ?? '', // Default to empty string if missing
+      userId: data['userId'] ?? '',
       title: data['title'] ?? 'Untitled',
       description: data['description'] ?? '',
       deadline: (data['deadline'] as Timestamp?)?.toDate() ?? DateTime.now(),
@@ -30,6 +30,7 @@ class TaskModel {
   }
 
   Map<String, dynamic> toMap() {
+    print("userId :: $userId");
     return {
       'userId': userId,
       'title': title,

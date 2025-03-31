@@ -116,7 +116,7 @@ class _SignUpScreenState extends State<SignUpScreen> with SingleTickerProviderSt
                                       passwordController.text,
                                       phoneController.text,
                                     );
-                                    if (result == "Signup successful!") {
+                                    if (result.contains("Signup successful!")) {
                                       Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const TaskListScreen()));
                                     } else {
                                       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result)));
@@ -130,7 +130,7 @@ class _SignUpScreenState extends State<SignUpScreen> with SingleTickerProviderSt
                               OutlinedButton.icon(
                                 onPressed: () async {
                                   String result = await authViewModel.signInWithGoogle();
-                                  if (result == "Google Sign-In successful!") {
+                                  if (result == "Sign-Up with Google successful!" || result == "Google Sign-In successful!") {
                                     Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const TaskListScreen()));
                                   } else {
                                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result)));

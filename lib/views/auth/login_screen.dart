@@ -136,7 +136,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                 label: const Text("Login with Google"),
                                 style: OutlinedButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
                               ),
-                              if (authViewModel.isSupported) ...[
+                              /*if (authViewModel.isSupported) ...[
                                 const SizedBox(height: 16),
                                 ElevatedButton.icon(
                                   onPressed: () async {
@@ -154,7 +154,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                     minimumSize: const Size(double.infinity, 50),
                                   ),
                                 ),
-                              ],
+                              ],*/
                             ],
                           ),
                           const SizedBox(height: 24),

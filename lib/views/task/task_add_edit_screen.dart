@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -118,6 +119,13 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
                           ? Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation(theme.colorScheme.primary)))
                           : ElevatedButton(
                         onPressed: () async {
+                          User? userTest = FirebaseAuth.instance.currentUser;
+                          if (userTest == null) {
+                            debugPrint("❌ User is not authenticated.");
+                            // return "Authentication required.";
+                          }
+                          debugPrint("✅ Authenticated User ID: ${userTest?.uid}");
+
                           if (_formKey.currentState!.validate()) {
                             if (_selectedDeadline.isBefore(DateTime.now())) {
                               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Deadline cannot be in the past")));
@@ -126,13 +134,14 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen> {
 
                             TaskModel newTask = TaskModel(
                               id: widget.task?.id,
-                              userId: authViewModel.currentUser!.uid,
+                              userId: FirebaseAuth.instance.currentUser!.uid,
                               title: _titleController.text,
                               description: _descController.text,
                               deadline: _selectedDeadline,
                               status: _selectedStatus,
                             );
 
+                            print(newTask.toMap());
                             try {
                               if (isEditing) {
                                 await taskViewModel.updateTask(newTask);

@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:local_auth/local_auth.dart';
@@ -92,14 +93,22 @@ class AuthViewModel with ChangeNotifier {
     _isLoading = true;
     notifyListeners();
     try {
-      String uid = await _authRepository.signUp(name, email, password, phone);
+      final UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      final String uid = userCredential.user!.uid;
       await _storeUserDataInFirestore(uid, name, email, phone);
-      await _fetchUserData(uid);
+
+      _currentUser = UserModel(uid: uid, name: name, email: email, phone: phone, createdAt: DateTime.now());
+
       await _storeCredentials(email, password);
+
       return "Signup successful!";
-    } finally {
-      _isLoading = false;
-      notifyListeners();
+    } catch (e, stackTrace) {
+      debugPrint("stackTrace :: $stackTrace");
+      return "Signup failed: ${e.toString()}";
     }
   }
 
@@ -108,12 +117,20 @@ class AuthViewModel with ChangeNotifier {
     notifyListeners();
     try {
       String uid = await _authRepository.login(email, password);
-      await _fetchUserData(uid);
-      await _storeCredentials(email, password);
-      return "Login successful!";
-    } finally {
+      print("uid :: $uid");
+      if(uid != "No account found. Please sign up") {
+        await _fetchUserData(uid);
+        await _storeCredentials(email, password);
+        return "Login successful!";
+      } else {
+        return uid;
+      }
+    } catch(error, stackTrace) {
       _isLoading = false;
       notifyListeners();
+      print("error in login:: $error");
+      print("stackTrace in login:: $stackTrace");
+      return '$error';
     }
   }
 
@@ -123,16 +140,22 @@ class AuthViewModel with ChangeNotifier {
         localizedReason: 'Authenticate to login',
         options: const AuthenticationOptions(stickyAuth: true, biometricOnly: true),
       );
-
       if (authenticated) {
         Map<String, String?> credentials = await _getStoredCredentials();
-        if (credentials['email'] != null && credentials['password'] != null) {
-          await login(credentials['email']!, credentials['password']!);
-          return true;
+        String? isGoogleUser = await _storage.read(key: 'isGoogleUser');
+        if (isGoogleUser == 'true') {
+          String result = await signInWithGoogle();
+          return result == "Google Sign-In successful!";
+        } else if (credentials['email'] != null && credentials['password'] != null) {
+          String result = await login(credentials['email']!, credentials['password']!);
+          return result == "Login successful!";
+        } else {
+          debugPrint("No valid credentials found");
         }
       }
       return false;
     } catch (e) {
+      debugPrint("Biometric login error: $e");
       return false;
     }
   }
@@ -157,17 +180,21 @@ class AuthViewModel with ChangeNotifier {
     _isLoading = true;
     notifyListeners();
     try {
-      final uid = await _authRepository.signInWithGoogle();
-      await _fetchUserData(uid);
-      if (_currentUser == null) {
-        await _storeUserDataInFirestore(uid, _currentUser!.name, _currentUser!.email, _currentUser!.phone);
+      Map<String, dynamic> result = await _authRepository.signInWithGoogle();
+      UserCredential userCredential = result['userCredential'];
+      bool isNewUser = result['isNewUser'];
+      User? user = userCredential.user;
+      if (user != null) {
+        await _fetchUserData(user.uid);
+        await _storage.write(key: 'email', value: _currentUser!.email);
+        await _storage.write(key: 'isGoogleUser', value: 'true');
+        return isNewUser ? "Sign-Up with Google successful!" : "Google Sign-In successful!";
       }
-      await _storage.write(key: 'email', value: _currentUser!.email);
-      await _storage.write(key: 'isGoogleUser', value: 'true');
-      return "Google Sign-In successful!";
-    } finally {
+      return "Google Sign-In failed unexpectedly.";
+    } catch (e) {
       _isLoading = false;
       notifyListeners();
+      return "Error during Google Sign-In: $e";
     }
   }
 
@@ -179,19 +206,27 @@ class AuthViewModel with ChangeNotifier {
 
   Future<void> authenticateUser(context) async {
     final user = currentUser;
+    _isCheckingAuth = true;
+    notifyListeners();
 
     if (user == null) {
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => LoginScreen()));
-      return;
+      Navigator.pushReplacementNamed(context, '/');
+      _isAuthenticated = false;
+    } else {
+      // If user exists, check biometrics only if supported and desired
+      if (isSupported) {
+        bool authenticated = await loginWithBiometrics();
+        _isAuthenticated = authenticated;
+        if (!authenticated) {
+          // Optionally prompt for biometrics again or allow manual login
+          Navigator.pushReplacementNamed(context, '/');
+        }
+      } else {
+        // No biometrics supported, consider user authenticated
+        _isAuthenticated = true;
+      }
     }
-
-    bool authenticated = await loginWithBiometrics();
-    _isAuthenticated = authenticated;
     _isCheckingAuth = false;
-
-    if (!authenticated) {
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => LoginScreen()));
-    }
     notifyListeners();
   }
 
@@ -203,16 +238,20 @@ class AuthViewModel with ChangeNotifier {
       );
 
       if (authenticated) {
-        String? email = await _storage.read(key: 'email');
-        String? isGoogleUser = await _storage.read(key: 'isGoogleUser');
-
-        if (email != null && isGoogleUser == 'true') {
-          await signInWithGoogle();
-          return true;
+        User? firebaseUser = FirebaseAuth.instance.currentUser;
+        if (firebaseUser != null) {
+          await _fetchUserData(firebaseUser.uid);
+          if (_currentUser != null) {
+            return true; // User is already signed in
+          }
         }
+        // If not signed in, trigger Google Sign-In
+        String result = await signInWithGoogle();
+        return result == "Google Sign-In successful!";
       }
       return false;
     } catch (e) {
+      debugPrint("Biometric Google Login Error: $e");
       return false;
     }
   }

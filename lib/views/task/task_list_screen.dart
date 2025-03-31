@@ -18,9 +18,12 @@ class _TaskListScreenState extends State<TaskListScreen> {
   @override
   void initState() {
     super.initState();
-    if(mounted) {
+    if (mounted) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        context.read<AuthViewModel>().authenticateUser(context);
+        final authViewModel = context.read<AuthViewModel>();
+       /* if (!authViewModel.isAuthenticated || authViewModel.currentUser == null) {
+          authViewModel.authenticateUser(context);
+        }*/
       });
     }
   }
@@ -32,15 +35,6 @@ class _TaskListScreenState extends State<TaskListScreen> {
     final userId = authViewModel.currentUser?.uid;
     final theme = Theme.of(context);
 
-    if (authViewModel.isCheckingAuth) {
-      return Scaffold(
-        body: Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation(theme.colorScheme.primary))),
-      );
-    }
-
-    if (!authViewModel.isAuthenticated || userId == null) {
-      return Scaffold(body: Center(child: Text("Authentication failed. Please log in.", style: theme.textTheme.bodyMedium)));
-    }
 
     return Scaffold(
       appBar: AppBar(
@@ -56,158 +50,156 @@ class _TaskListScreenState extends State<TaskListScreen> {
           ),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: () async => taskViewModel.fetchTasks(userId),
-        child: Column(
-          children: [
-            SizedBox(height: 10,),
-            Wrap(
-              spacing: 10,
-              children: ["All", "Pending", "Completed", "Overdue"].map((status) {
-                Color chipColor;
-                switch (status) {
-                  case "Completed":
-                    chipColor = Colors.green;
-                    break;
-                  case "Overdue":
-                    chipColor = Colors.red;
-                    break;
-                  case "Pending":
-                    chipColor = Colors.orange;
-                    break;
-                  default:
-                    chipColor = Colors.blueGrey;
+      body: Column(
+        children: [
+          SizedBox(height: 10,),
+          Wrap(
+            spacing: 10,
+            children: ["All", "Pending", "Completed", "Overdue"].map((status) {
+              Color chipColor;
+              switch (status) {
+                case "Completed":
+                  chipColor = Colors.green;
+                  break;
+                case "Overdue":
+                  chipColor = Colors.red;
+                  break;
+                case "Pending":
+                  chipColor = Colors.orange;
+                  break;
+                default:
+                  chipColor = Colors.blueGrey;
+              }
+
+              return ChoiceChip(
+                label: Text(status),
+                selected: taskViewModel.filterStatus == status,
+                onSelected: (selected) {
+                  if (selected) {
+                    taskViewModel.setFilterStatus(status);
+                  }
+                },
+                elevation: 5,
+                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20)
+                ),
+                selectedColor: chipColor.withAlpha(1000),
+                backgroundColor: chipColor.withAlpha(50),
+                side: BorderSide(color: taskViewModel.filterStatus == status ? chipColor.withAlpha(50) : chipColor.withAlpha(1000)),
+                labelStyle: taskViewModel.filterStatus == status
+                    ? Theme.of(context).chipTheme.secondaryLabelStyle
+                    : Theme.of(context).chipTheme.labelStyle,
+              );
+            }).toList(),
+          ),
+          if(userId != null)
+          Expanded(
+            child: StreamBuilder<List<TaskModel>>(
+              stream: taskViewModel.fetchTasks(userId),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation(theme.colorScheme.primary)));
+                }
+                if (snapshot.hasError) {
+                  return Center(child: Text("Error: ${snapshot.error}", style: theme.textTheme.bodyMedium));
+                }
+                if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  return Center(child: Text("No tasks found.", style: theme.textTheme.bodyMedium));
                 }
 
-                return ChoiceChip(
-                  label: Text(status),
-                  selected: taskViewModel.filterStatus == status,
-                  onSelected: (selected) {
-                    if (selected) {
-                      taskViewModel.setFilterStatus(status);
-                    }
-                  },
-                  elevation: 5,
-                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20)
-                  ),
-                  selectedColor: chipColor.withAlpha(1000),
-                  backgroundColor: chipColor.withAlpha(50),
-                  side: BorderSide(color: taskViewModel.filterStatus == status ? chipColor.withAlpha(50) : chipColor.withAlpha(1000)),
-                  labelStyle: taskViewModel.filterStatus == status
-                      ? Theme.of(context).chipTheme.secondaryLabelStyle
-                      : Theme.of(context).chipTheme.labelStyle,
-                );
-              }).toList(),
-            ),
-            Expanded(
-              child: StreamBuilder<List<TaskModel>>(
-                stream: taskViewModel.fetchTasks(userId),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation(theme.colorScheme.primary)));
-                  }
-                  if (snapshot.hasError) {
-                    return Center(child: Text("Error: ${snapshot.error}", style: theme.textTheme.bodyMedium));
-                  }
-                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    return Center(child: Text("No tasks found.", style: theme.textTheme.bodyMedium));
-                  }
-              
-                  final tasks = snapshot.data!;
-                  return ListView.builder(
-                    padding: const EdgeInsets.all(8.0),
-                    itemCount: tasks.length,
-                    itemBuilder: (context, index) {
-                      final task = tasks[index];
-                      final theme = Theme.of(context);
-                      Color statusColor = _getStatusColor(task.status);
+                final tasks = snapshot.data!;
+                return ListView.builder(
+                  padding: const EdgeInsets.all(8.0),
+                  itemCount: tasks.length,
+                  itemBuilder: (context, index) {
+                    final task = tasks[index];
+                    final theme = Theme.of(context);
+                    Color statusColor = _getStatusColor(task.status);
 
-                      return GestureDetector(
-                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => AddEditTaskScreen(task: task,))),
-                        child: Card(
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          elevation: 3,
-                          margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-                          child: Padding(
-                            padding: const EdgeInsets.all(8),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                Container(
-                                  width: 8,
-                                  height: 60,
-                                  decoration: BoxDecoration(
-                                    color: statusColor,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
+                    return GestureDetector(
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => AddEditTaskScreen(task: task,))),
+                      child: Card(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        elevation: 3,
+                        margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+                        child: Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Container(
+                                width: 8,
+                                height: 60,
+                                decoration: BoxDecoration(
+                                  color: statusColor,
+                                  borderRadius: BorderRadius.circular(8),
                                 ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        task.title,
-                                        style: theme.textTheme.titleMedium!.copyWith(fontWeight: FontWeight.bold),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        task.description,
-                                        style: theme.textTheme.bodySmall!.copyWith(color: Colors.grey.shade600),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          // Deadline
-                                          Row(
-                                            children: [
-                                              const Icon(Icons.calendar_today, size: 14, color: Colors.grey),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                DateFormat("dd/MM/yyyy").format(task.deadline),
-                                                style: theme.textTheme.bodySmall,
-                                              ),
-                                            ],
-                                          ),
-                                          // Status badge
-                        
-                                        ],
-                                      ),
-                                    ],
-                                  ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      task.title,
+                                      style: theme.textTheme.titleMedium!.copyWith(fontWeight: FontWeight.bold),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      task.description,
+                                      style: theme.textTheme.bodySmall!.copyWith(color: Colors.grey.shade600),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        // Deadline
+                                        Row(
+                                          children: [
+                                            const Icon(Icons.calendar_today, size: 14, color: Colors.grey),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              DateFormat("dd/MM/yyyy").format(task.deadline),
+                                              style: theme.textTheme.bodySmall,
+                                            ),
+                                          ],
+                                        ),
+                                        // Status badge
+
+                                      ],
+                                    ),
+                                  ],
                                 ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: statusColor.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  child: Text(
-                                    task.status,
-                                    style: theme.textTheme.bodySmall!.copyWith(color: statusColor, fontWeight: FontWeight.w600, fontSize: 12),
-                                  ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: statusColor.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(16),
                                 ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete, color: Colors.red),
-                                  onPressed: () => _confirmDelete(context, task, taskViewModel),
+                                child: Text(
+                                  task.status,
+                                  style: theme.textTheme.bodySmall!.copyWith(color: statusColor, fontWeight: FontWeight.w600, fontSize: 12),
                                 ),
-                              ],
-                            ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.delete, color: Colors.red),
+                                onPressed: () => _confirmDelete(context, task, taskViewModel),
+                              ),
+                            ],
                           ),
                         ),
-                      );
-                    },
-                  );
-                },
-              ),
+                      ),
+                    );
+                  },
+                );
+              },
             ),
-          ],
-        ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: theme.colorScheme.secondary,
